@@ -1,32 +1,21 @@
-from typing import List
 from fastapi import FastAPI
-from pydantic import BaseModel, EmailStr, validator, AnyUrl, HttpUrl ,BaseSettings
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from schema import Email, EmailList
+from settings import Settings
 
-from dotenv import load_dotenv
-
-load_dotenv()
-class Email(BaseModel):
-    sender: EmailStr
-    receiver: EmailStr
-    subject: str
-    body: str
-
-class EmailList(BaseModel):
-    email_list: List[EmailStr]
-
-class Settings(BaseSettings):
-    email_user: str
-    email_password: str
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 app = FastAPI()
 settings = Settings()
+
+
+def _send_email(message, sender, receiver):
+    with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
+        smtp.starttls()
+        smtp.login(settings.email_user, settings.email_password)
+        smtp.sendmail(sender, receiver, message.as_string())
+
 
 @app.post("/send_email/")
 def send_email(email: Email):
@@ -36,12 +25,10 @@ def send_email(email: Email):
     message['Subject'] = email.subject
     message.attach(MIMEText(email.body, 'plain'))
 
-    with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
-        smtp.starttls()
-        smtp.login(settings.email_user, settings.email_password)
-        smtp.sendmail(email.sender, email.receiver, message.as_string())
+    _send_email(message, email.sender, email.receiver)
 
     return {"message": "Email sent successfully."}
+
 
 @app.post("/send_emails/")
 def send_emails(email_list: EmailList):
@@ -53,9 +40,6 @@ def send_emails(email_list: EmailList):
         message['Subject'] = email.subject
         message.attach(MIMEText(email.body, 'plain'))
 
-        with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
-            smtp.starttls()
-            smtp.login(settings.email_user, settings.email_password)
-            smtp.sendmail(email.sender, email.receiver, message.as_string())
+        _send_email(message, email.sender, email.receiver)
 
     return {"message": "Emails sent successfully."}
